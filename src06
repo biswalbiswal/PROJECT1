@@ -1,0 +1,154 @@
+000100 IDENTIFICATION DIVISION.                                         00010001
+000200 PROGRAM-ID. P04AP06.                                             00020001
+000300 DATA DIVISION.                                                   00030001
+000400 WORKING-STORAGE SECTION.                                         00040001
+000500 01  WS-RESP-CODE     PIC S9(08) COMP VALUE ZERO.                 00050001
+000600 01  WS-CA.                                                       00060001
+000700     03 WS-PROCESS-FLAG      PIC X(01) VALUE SPACES.              00070001
+000800        88  PROCESS-CRTMAP      VALUE '1'.                        00080001
+000900        88  PROCESS-ADD         VALUE '2'.                        00090001
+001000     03  WS-BRO-ID           PIC X(03) VALUE SPACES.              00100001
+001100 01  WS-DATEIN        PIC X(10) VALUE SPACES.                     00110001
+001200 01  WS-TIMEIN        PIC X(08) VALUE SPACES.                     00120001
+001300 01  WS-DATE-TIME     PIC S9(15) COMP-3 VALUE ZERO.               00130001
+001400 01  WS-VALID-FLAG    PIC X(01) VALUE 'N'.                        00140001
+001500     88 VALID-DATA              VALUE 'Y'.                        00150001
+001600 01  WS-DOB.                                                      00160001
+001700         05 WS-DATE-DD        PIC 9(02) VALUE ZERO.               00170001
+001800         05 FILLER         PIC X(01) VALUE '/'.                   00180001
+001900         05 WS-DATE-MMM       PIC X(03) VALUE ZERO.               00190001
+002000         05 FILLER         PIC X(01) VALUE '/'.                   00200001
+002100         05 WS-DATE-YYYY      PIC 9(04) VALUE ZERO.               00210001
+002200 01  WS-DATE-TABLE    PIC X(36) VALUE                             00220001
+002300     'JANFEBMARAPRMAYJUNJULAUGSEPOCTNOVDEC'.                      00230001
+002400 01  FILLER REDEFINES WS-DATE-TABLE.                              00240001
+002500          05 WS-MONTH  PIC X(03) OCCURS 12 TIMES.                 00250001
+002600 01  WS-DATE.                                                     00260001
+002700         05 WS-DOB-YYYY      PIC 9(04) VALUE ZERO.                00270001
+002800         05 WS-DOB-MM        PIC 9(02) VALUE ZERO.                00280001
+002900         05 WS-DOB-DD        PIC 9(02) VALUE ZERO.                00290001
+003000 01  WS-MESSAGE  PIC X(30) VALUE                                  00300001
+003100     'END OF THE PROGRAM, BYE, BYE!!'.                            00310001
+003200 COPY DFHBMSCA.                                                   00320001
+003300 COPY BROKREC.                                                    00330001
+003400 COPY P04AS06.                                                    00340004
+003500 COPY DFHAID.                                                     00350001
+003600 LINKAGE SECTION.                                                 00360001
+003700 01  DFHCOMMAREA     PIC X(04).                                   00370002
+003800 PROCEDURE DIVISION.                                              00380001
+003900 MAIN-PARA.                                                       00390001
+004000     IF EIBCALEN = ZERO                                           00400001
+004100         PERFORM FIRST-PARA                                       00410001
+004200     ELSE                                                         00420001
+004300         MOVE DFHCOMMAREA TO WS-CA                                00430001
+004400         PERFORM NEXT-PARA                                        00440005
+004500     END-IF.                                                      00450001
+004600 END-PARA.                                                        00460001
+004700     EXEC CICS RETURN                                             00470001
+004800         TRANSID('P04F')                                          00480001
+004900         COMMAREA(WS-CA)                                          00490001
+005000     END-EXEC.                                                    00500001
+005100 FIRST-PARA.                                                      00510001
+005200     MOVE LOW-VALUES TO BCRTMAPO                                  00520001
+005300     PERFORM SEND-MAP-FIRST.                                      00530001
+005400 SEND-MAP-FIRST.                                                  00540001
+005500     PERFORM DATE-TIME-PARA                                       00550001
+005600     MOVE -1 TO BIDL                                              00560001
+005700     EXEC CICS SEND                                               00570001
+005800         MAP('BCRTMAP')                                           00580001
+005900         MAPSET('P04AS06')                                        00590001
+006000         FROM (BCRTMAPO)                                          00600001
+006100         CURSOR                                                   00610001
+006200         ERASE                                                    00620001
+006300     END-EXEC                                                     00630001
+006400     SET PROCESS-CRTMAP TO TRUE.                                  00640001
+006500 NEXT-PARA.                                                       00650001
+006600     EVALUATE TRUE                                                00660001
+006700       WHEN PROCESS-CRTMAP                                        00670001
+006800          PERFORM PROCESS-CRT-MAP                                 00680001
+006900     END-EVALUATE                                                 00690005
+007000     PERFORM SEND-MAP-FIRST.                                      00700005
+007100 PROCESS-CRT-MAP.                                                 00710001
+007200     EVALUATE EIBAID                                              00720001
+007300       WHEN DFHENTER                                              00730001
+007400         PERFORM RECEIVE-FIRST-MAP                                00740001
+007500         PERFORM PROCESS-CRT-PARA                                 00750001
+007600       WHEN DFHPF3                                                00760001
+007700         EXEC CICS XCTL                                           00770001
+007800             PROGRAM('P04AP06')                                   00780001
+007900         END-EXEC                                                 00790001
+008000         EXEC CICS RETURN                                         00800001
+008100         END-EXEC                                                 00810001
+008200       WHEN OTHER                                                 00820001
+008300         MOVE 'INVALID KEY IS PRESSED' TO MSG3O                   00830001
+008400     END-EVALUATE.                                                00840001
+008500 PROCESS-CRT-PARA.                                                00850001
+008600     IF BIDL = ZERO OR BIDI = SPACES                              00860001
+008700        MOVE 'PLEASE ENTER AN BROKERID' TO MSG3O                  00870001
+008800*       SET PROCESS-CRTMAP TO TRUE                                00880005
+008900     ELSE                                                         00890001
+009000              PERFORM READ-EMPLOYEE                               00900001
+009100     END-IF.                                                      00910001
+009200 READ-EMPLOYEE.                                                   00920001
+009300     MOVE BIDI TO WS-BRO-ID                                       00930005
+009400     EXEC CICS READ                                               00940001
+009500          FILE('P04AFILE')                                        00950001
+009600          RIDFLD(WS-BRO-ID)                                       00960001
+009700          INTO(BROKER-RECORD)                                     00970001
+009800          RESP(WS-RESP-CODE)                                      00980001
+009900     END-EXEC                                                     00990001
+010000     EVALUATE WS-RESP-CODE                                        01000001
+010100          WHEN DFHRESP(NORMAL)                                    01010001
+010200             MOVE 'BROKER ALREADY EXIST' TO MSG3O                 01020001
+010300          WHEN DFHRESP(NOTFND)                                    01030001
+010400             PERFORM ADD-PARA                                     01040005
+010500          WHEN OTHER                                              01050001
+010600             MOVE 'ERROR ACCESSING DATA' TO MSG3O                 01060001
+010700     END-EVALUATE.                                                01070001
+010800 RECEIVE-FIRST-MAP.                                               01080003
+010900     EXEC CICS RECEIVE                                            01090003
+011000         MAP('BCRTMAP')                                           01100003
+011100         MAPSET('P04AS06')                                        01110003
+011200         INTO(BCRTMAPI)                                           01120003
+011300     END-EXEC.                                                    01130003
+011400 ADD-PARA.                                                        01140001
+011500        PERFORM MOVE-PARA                                         01150001
+011600        PERFORM WRITE-PARA.                                       01160001
+011700 MOVE-PARA.                                                       01170001
+011800             MOVE WS-BRO-ID  TO BRO-ID                            01180002
+011900             MOVE BPASSI      TO BRO-PASS                         01190005
+012000             MOVE NAMEI      TO BRO-NAME                          01200002
+012100             MOVE EMAILI     TO BRO-MAIL                          01210002
+012200             MOVE DOBDDI    TO BRO-DOB(7:2)                       01220002
+012300             MOVE DOBMMI    TO BRO-DOB(5:2)                       01230002
+012400             MOVE DOBYYI    TO BRO-DOB(1:4)                       01240002
+012500             MOVE EARNI     TO BRO-EARN                           01250002
+012600             MOVE DEDNI    TO BRO-DEDN.                           01260005
+012700 DATE-TIME-PARA.                                                  01270003
+012800     EXEC CICS ASKTIME                                            01280003
+012900          ABSTIME(WS-DATE-TIME)                                   01290003
+013000     END-EXEC                                                     01300003
+013100     EXEC CICS FORMATTIME                                         01310003
+013200          ABSTIME(WS-DATE-TIME)                                   01320003
+013300          DDMMYYYY(WS-DATEIN)                                     01330003
+013400          DATESEP('-')                                            01340003
+013500          TIME(WS-TIMEIN)                                         01350003
+013600          TIMESEP                                                 01360003
+013700     END-EXEC                                                     01370003
+013800     MOVE WS-DATEIN TO DATE3O                                     01380003
+013900     MOVE WS-TIMEIN TO TIME3O.                                    01390003
+014000 WRITE-PARA.                                                      01400003
+014100     EXEC CICS WRITE                                              01410003
+014200         FILE('P04AFILE')                                         01420003
+014300         RIDFLD(WS-BRO-ID)                                        01430003
+014400         FROM(BROKER-RECORD)                                      01440003
+014500         RESP(WS-RESP-CODE)                                       01450003
+014600     END-EXEC                                                     01460003
+014700     EVALUATE WS-RESP-CODE                                        01470003
+014800         WHEN DFHRESP(NORMAL)                                     01480003
+014900           MOVE 'ACCOUNT SUCCESSFULLY CREATED' TO MSG3O           01490003
+015000         WHEN OTHER                                               01500003
+015100           MOVE 'SOMETHING WENT WRONG' TO MSG3O                   01510003
+015200     END-EVALUATE                                                 01520003
+015300     SET PROCESS-CRTMAP TO TRUE                                   01530003
+015400     MOVE WS-BRO-ID TO BIDO.                                      01540003

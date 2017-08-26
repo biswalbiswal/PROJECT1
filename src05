@@ -1,0 +1,156 @@
+000100 IDENTIFICATION DIVISION.                                         00010000
+000200 PROGRAM-ID. P04AP05.                                             00020000
+000300 DATA DIVISION.                                                   00030000
+000400 WORKING-STORAGE SECTION.                                         00040000
+000500 01  WS-RESP-CODE     PIC S9(08) COMP VALUE ZERO.                 00050000
+000600 01  WS-CA.                                                       00060000
+000700     03 WS-PROCESS-FLAG      PIC X(01) VALUE SPACES.              00070000
+000800        88  PROCESS-USERMAP      VALUE '1'.                       00080001
+000900        88  PROCESS-ADD         VALUE '2'.                        00090000
+001000     03  WS-USER-ID           PIC X(05) VALUE SPACES.             00100001
+001100 01  WS-DATEIN        PIC X(10) VALUE SPACES.                     00110000
+001200 01  WS-TIMEIN        PIC X(08) VALUE SPACES.                     00120000
+001300 01  WS-DATE-TIME     PIC S9(15) COMP-3 VALUE ZERO.               00130000
+001400 01  WS-VALID-FLAG    PIC X(01) VALUE 'N'.                        00140000
+001500     88 VALID-DATA              VALUE 'Y'.                        00150000
+001600 01  WS-DOB.                                                      00160000
+001700         05 WS-DATE-DD        PIC 9(02) VALUE ZERO.               00170000
+001800         05 FILLER         PIC X(01) VALUE '/'.                   00180000
+001900         05 WS-DATE-MMM       PIC X(03) VALUE ZERO.               00190000
+002000         05 FILLER         PIC X(01) VALUE '/'.                   00200000
+002100         05 WS-DATE-YYYY      PIC 9(04) VALUE ZERO.               00210000
+002200 01  WS-DATE-TABLE    PIC X(36) VALUE                             00220000
+002300     'JANFEBMARAPRMAYJUNJULAUGSEPOCTNOVDEC'.                      00230000
+002400 01  FILLER REDEFINES WS-DATE-TABLE.                              00240000
+002500          05 WS-MONTH  PIC X(03) OCCURS 12 TIMES.                 00250000
+002600 01  WS-DATE.                                                     00260000
+002700         05 WS-DOB-YYYY      PIC 9(04) VALUE ZERO.                00270000
+002800         05 WS-DOB-MM        PIC 9(02) VALUE ZERO.                00280000
+002900         05 WS-DOB-DD        PIC 9(02) VALUE ZERO.                00290000
+003000 01  WS-MESSAGE  PIC X(30) VALUE                                  00300000
+003100     'END OF THE PROGRAM, BYE, BYE!!'.                            00310000
+003200 COPY DFHBMSCA.                                                   00320000
+003300 COPY USERREC.                                                    00330002
+003400 COPY P04AS05.                                                    00340002
+003500 COPY DFHAID.                                                     00350000
+003600 LINKAGE SECTION.                                                 00360000
+003700 01  DFHCOMMAREA     PIC X(06).                                   00370001
+003800 PROCEDURE DIVISION.                                              00380000
+003900 MAIN-PARA.                                                       00390000
+004000     IF EIBCALEN = ZERO                                           00400000
+004100         PERFORM FIRST-PARA                                       00410000
+004200     ELSE                                                         00420000
+004300         MOVE DFHCOMMAREA TO WS-CA                                00430000
+004400         PERFORM NEXT-PARA                                        00440000
+004500     END-IF.                                                      00450000
+004600 END-PARA.                                                        00460000
+004700     EXEC CICS RETURN                                             00470000
+004800         TRANSID('P04E')                                          00480001
+004900         COMMAREA(WS-CA)                                          00490000
+005000     END-EXEC.                                                    00500000
+005100 FIRST-PARA.                                                      00510000
+005200     MOVE LOW-VALUES TO USERMAPO                                  00520001
+005300     PERFORM SEND-MAP-FIRST.                                      00530000
+005400 SEND-MAP-FIRST.                                                  00540000
+005500     PERFORM DATE-TIME-PARA                                       00550000
+005600     MOVE -1 TO UIDL                                              00560001
+005700     EXEC CICS SEND                                               00570000
+005800         MAP('USERMAP')                                           00580001
+005900         MAPSET('P04AS05')                                        00590001
+006000         FROM (USERMAPO)                                          00600001
+006100         CURSOR                                                   00610000
+006200         ERASE                                                    00620000
+006300     END-EXEC                                                     00630000
+006400     SET PROCESS-USERMAP TO TRUE.                                 00640001
+006500 NEXT-PARA.                                                       00650000
+006600     EVALUATE TRUE                                                00660000
+006700       WHEN PROCESS-USERMAP                                       00670001
+006800          PERFORM PROCESS-USER-MAP                                00680001
+006900     END-EVALUATE                                                 00690000
+007000     PERFORM SEND-MAP-FIRST.                                      00700000
+007100 PROCESS-USER-MAP.                                                00710001
+007200     EVALUATE EIBAID                                              00720000
+007300       WHEN DFHENTER                                              00730000
+007400         PERFORM RECEIVE-FIRST-MAP                                00740000
+007500         PERFORM PROCESS-USER-PARA                                00750001
+007600       WHEN DFHPF3                                                00760000
+007700         EXEC CICS XCTL                                           00770000
+007800             PROGRAM('P04AP05')                                   00780002
+007900         END-EXEC                                                 00790000
+008000         EXEC CICS RETURN                                         00800000
+008100         END-EXEC                                                 00810000
+008200       WHEN OTHER                                                 00820000
+008300         MOVE 'INVALID KEY IS PRESSED' TO MSG5O                   00830002
+008400     END-EVALUATE.                                                00840000
+008500 PROCESS-USER-PARA.                                               00850001
+008600     IF UIDL = ZERO OR UIDI = SPACES                              00860002
+008700        MOVE 'PLEASE ENTER AN BROKERID' TO MSG5O                  00870002
+008800*       SET PROCESS-USERMAP TO TRUE                               00880001
+008900     ELSE                                                         00890000
+009000              PERFORM READ-EMPLOYEE                               00900000
+009100     END-IF.                                                      00910000
+009200 READ-EMPLOYEE.                                                   00920000
+009300     MOVE UIDI TO WS-USER-ID                                      00930002
+009400     EXEC CICS READ                                               00940000
+009500          FILE('P04BFILE')                                        00950002
+009600          RIDFLD(WS-USER-ID)                                      00960002
+009700          INTO(USER-RECORD)                                       00970002
+009800          RESP(WS-RESP-CODE)                                      00980000
+009900     END-EXEC                                                     00990000
+010000     EVALUATE WS-RESP-CODE                                        01000000
+010100          WHEN DFHRESP(NORMAL)                                    01010000
+010200             MOVE 'USER ALREADY EXIST' TO MSG5O                   01020002
+010300          WHEN DFHRESP(NOTFND)                                    01030000
+010400             PERFORM ADD-PARA                                     01040000
+010500          WHEN OTHER                                              01050000
+010600             MOVE 'ERROR ACCESSING DATA' TO MSG5O                 01060002
+010700     END-EVALUATE.                                                01070000
+010800 RECEIVE-FIRST-MAP.                                               01080000
+010900     EXEC CICS RECEIVE                                            01090000
+011000         MAP('USERMAP')                                           01100002
+011100         MAPSET('P04AS05')                                        01110002
+011200         INTO(USERMAPI)                                           01120002
+011300     END-EXEC.                                                    01130000
+011400 ADD-PARA.                                                        01140000
+011500        PERFORM MOVE-PARA                                         01150000
+011600        PERFORM WRITE-PARA.                                       01160000
+011700 MOVE-PARA.                                                       01170000
+011800             MOVE WS-USER-ID  TO USER-ID                          01180002
+011900             MOVE UNAMEI      TO USER-NAME                        01190003
+012000*            MOVE UPASSI      TO USER-PASS                        01200003
+012100             MOVE EMAILI      TO USER-MAIL                        01210002
+012200             MOVE CONT5I      TO USER-CONT                        01220003
+012300             MOVE DOBDDI      TO USER-DOB(7:2)                    01230002
+012400             MOVE DOBMMI      TO USER-DOB(5:2)                    01240002
+012500             MOVE DOBYYI      TO USER-DOB(1:4)                    01250002
+012600             MOVE ADDRI       TO USER-ADD                         01260004
+012700             MOVE IFSCI       TO USER-IFSC                        01270002
+012800             MOVE ACCNTI      TO USER-ACCNT.                      01280002
+012900 DATE-TIME-PARA.                                                  01290000
+013000     EXEC CICS ASKTIME                                            01300000
+013100          ABSTIME(WS-DATE-TIME)                                   01310000
+013200     END-EXEC                                                     01320000
+013300     EXEC CICS FORMATTIME                                         01330000
+013400          ABSTIME(WS-DATE-TIME)                                   01340000
+013500          DDMMYYYY(WS-DATEIN)                                     01350000
+013600          DATESEP('-')                                            01360000
+013700          TIME(WS-TIMEIN)                                         01370000
+013800          TIMESEP                                                 01380000
+013900     END-EXEC                                                     01390000
+014000     MOVE WS-DATEIN TO DATE5O                                     01400002
+014100     MOVE WS-TIMEIN TO TIME5O.                                    01410002
+014200 WRITE-PARA.                                                      01420000
+014300     EXEC CICS WRITE                                              01430000
+014400         FILE('P04BFILE')                                         01440002
+014500         RIDFLD(WS-USER-ID)                                       01450002
+014600         FROM(USER-RECORD)                                        01460002
+014700         RESP(WS-RESP-CODE)                                       01470000
+014800     END-EXEC                                                     01480000
+014900     EVALUATE WS-RESP-CODE                                        01490000
+015000         WHEN DFHRESP(NORMAL)                                     01500000
+015100           MOVE 'ACCOUNT SUCCESSFULLY CREATED' TO MSG5O           01510002
+015200         WHEN OTHER                                               01520000
+015300           MOVE 'SOMETHING WENT WRONG' TO MSG5O                   01530002
+015400     END-EVALUATE                                                 01540000
+015500     SET PROCESS-USERMAP TO TRUE                                  01550001
+015600     MOVE WS-USER-ID TO UIDO.                                     01560002
